@@ -126,20 +126,29 @@ stdout_lock = threading.Lock()
 ########################## SIGINT Signal Hander ##########################
 # ...for gracefull shutdown
 def parse_config_list(config_txt):
-    """Gibt eine Liste von Assign‑Nodes zurück – robust gegen flache/verschachtelte ASTs."""
-    tree_json = json.loads(ast.to_pretty_json(ast.parse(config_txt)))
-    # Top‑Level ermitteln
+    tree = ast.parse(config_txt)
+    tree_json = json.loads(ast.to_pretty_json(tree))
     top = tree_json.get("Chunk", tree_json)
-    # Statements extrahieren
     stmts = top.get("body", top)
-    # Block‑Wrapper abwickeln
     if isinstance(stmts, dict) and "Block" in stmts:
         stmts = stmts["Block"].get("body", [])
+
     if not isinstance(stmts, list):
-        print("❌ Konfig‑Parsing fehlgeschlagen, unerwarteter Body:", file=sys.stderr)
-        print(json.dumps(tree_json, indent=2), file=sys.stderr)
+        print("❌ Ungültiger Body:", file=sys.stderr)
         sys.exit(1)
-    return stmts
+
+    valid_assignments = []
+    for item in stmts:
+        if "Assign" in item:
+            assign = item["Assign"]
+            try:
+                if assign["targets"][0].get("Name"):
+                    valid_assignments.append(assign)
+            except Exception as e:
+                print(f"⚠️  Überspringe ungültigen Assign-Block: {e}", file=sys.stderr)
+                continue
+    return valid_assignments
+
 
 def signal_handler_sigint(signum, frame):
     global GLOBAL_SHUTDOWN, DEF_SYN_TIMEOUT
@@ -850,56 +859,58 @@ def main(argv):
 
     if len(config_txt) > 0:  # Parse config
         for item in parse_config_list(config_txt):
-            key = item['Assign']['targets'][0]['Name']['id']
-            value_list = item['Assign']['values'][0]
-            if 'String' in value_list:
-                if 's' in value_list['String']:
-                    value = value_list['String']['s']
-            elif 'Number' in value_list:
-                if 'n' in value_list['Number']:
-                    value = value_list['Number']['n']
-                else:
-                    value = 0
-            if key in "hostaddress":
-                DEF_HOSTADDRESS = str(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "con_wait":
-                DEF_CON_WAIT = int(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "syn_timeout":
-                DEF_SYN_TIMEOUT = int(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "syn_wait_proxy":
-                DEF_SYN_WAIT_PROXY = int(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "syn_empty_queue":
-                DEF_SYN_EMPTY_QUEUE = bool(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "header_fifo":
-                DEF_HEADER_FIFO = str(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "connection_fifo":
-                DEF_CONNECTION_FIFO = str(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "user":
-                DEF_USER = str(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "group":
-                DEF_GROUP = str(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "best_guess":
-                DEF_BEST_GUESS = bool(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "best_guess_timeout":
-                DEF_BEST_GUESS_TIMEOUT = int(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "enable_conntrack":
-                DEF_ENABLE_CONNTRACK = bool(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "ct_status_grace_time":
-                DEF_CT_STATUS_GRACE_TIME = int(value)
-                eprint("\t" + key + " = " + str(value))
+            try:
+                key = item['targets'][0]['Name']['id']
+                value_item = item['values'][0]
 
+                if 'String' in value_item:
+                    value = value_item['String']['s']
+                elif 'Number' in value_item:
+                    value = value_item['Number'].get('n', 0)
+                else:
+                    value = None
+                if key in "hostaddress":
+                    DEF_HOSTADDRESS = str(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "con_wait":
+                    DEF_CON_WAIT = int(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "syn_timeout":
+                    DEF_SYN_TIMEOUT = int(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "syn_wait_proxy":
+                    DEF_SYN_WAIT_PROXY = int(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "syn_empty_queue":
+                    DEF_SYN_EMPTY_QUEUE = bool(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "header_fifo":
+                    DEF_HEADER_FIFO = str(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "connection_fifo":
+                    DEF_CONNECTION_FIFO = str(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "user":
+                    DEF_USER = str(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "group":
+                    DEF_GROUP = str(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "best_guess":
+                    DEF_BEST_GUESS = bool(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "best_guess_timeout":
+                    DEF_BEST_GUESS_TIMEOUT = int(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "enable_conntrack":
+                    DEF_ENABLE_CONNTRACK = bool(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "ct_status_grace_time":
+                    DEF_CT_STATUS_GRACE_TIME = int(value)
+                    eprint("\t" + key + " = " + str(value))
+            except Exception as e:
+                print(f"⚠️  Fehler beim Verarbeiten einer Konfig-Zeile: {e}", file=sys.stderr)
+                continue
         eprint(logtime + " [PID " + str(os.getpid()) + "]" +
                " ...done. Not configured values fall back to default values!.")
     else:

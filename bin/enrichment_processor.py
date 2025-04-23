@@ -707,73 +707,84 @@ def main(argv):
     if len(config_txt) > 0:  # Parse config
         ip_server_client_configured = False
         for item in parse_config_list(config_txt):
-            key = item['Assign']['targets'][0]['Name']['id']
-            value_list = item['Assign']['values'][0]
-            if 'String' in value_list:
-                try:
-                    value = value_list['String']['s']
-                except KeyError: #empty String
-                    value = ""
-            elif 'Number' in value_list:
-                if 'n' in value_list['Number']:
-                    value = value_list['Number']['n']
-                else:
-                    value = 0
-            elif 'Table' in value_list:
-                value = value_list
+            try:
+                # Sichere Prüfung auf Struktur
+                if "Assign" not in item:
+                    continue
+                assign = item["Assign"]
+                if not isinstance(assign.get("targets", [])[0], dict):
+                    continue
+                name_node = assign["targets"][0].get("Name")
+                if not name_node or "id" not in name_node:
+                    continue
 
-            if key in "enr_timeout":
-                DEF_TIMEOUT = int(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "acquire_interval":
-                DEF_ACQUIRE_INTERVAL = int(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "dns_server":
-                DEF_DNS_SERVER = str(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "extip_dnsname":
-                DEF_EXTIP_DNSNAME = str(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "enr_split_hd_lines":
-                DEF_ENR_SPLIT = int(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "madcatlog_fifo":
-                DEF_MADCATLOG_FIFO = str(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "user":
-                DEF_USER = str(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "group":
-                DEF_GROUP = str(value)
-                eprint("\t" + key + " = " + str(value))
-            if key in "enr_output_files": #value is a parsed Lua-Table!
-                    DEF_OUTPUT_FILES = list()
-                    GLOBAL_OUTPUT_STDOUT = False #if configured, set STDOUT output to false
-                    try:
-                        eprint("\tenr_output_files:")
-                        for field in value['Table']['fields']:
-                            eprint("\t\t" + field['Field']['value']['String']['s'])
-                            try: #numbers are ignored, because filenames must be strings
-                                if field['Field']['value']['String']['s'] == "<STDOUT>":
-                                    GLOBAL_OUTPUT_STDOUT = True #if STDOUT is explicitly set, set STDOUT output back to true
-                                    continue
-                                DEF_OUTPUT_FILES.append(field['Field']['value']['String']['s'])
-                                GLOBAL_OUTPUT_FILES = True
-                                continue
-                            except KeyError:
-                                pass
-                    except KeyError: #empty table, set back STDOUT output to true as default
-                        DEF_OUTPUT_FILES = None
-                        GLOBAL_OUTPUT_FILES = False
-                        GLOBAL_OUTPUT_STDOUT = True
-            if key in "enr_ip_server_backend":
-                ip_server_client_configured = True
-                if GLOBAL_IP_SERVER_CLIENT_PRESENT:
-                    DEF_IP_SERVER_HOST = str(value)
-                    ip_server.client.config(DEF_IP_SERVER_HOST, "\tBACKEND SYNC: ")
-                    eprint("\t" + key + " = " + str(value))
+                key = name_node["id"]
+                value_node = assign["values"][0]
+
+                if 'String' in value_node:
+                    value = value_node['String'].get('s', "")
+                elif 'Number' in value_node:
+                    value = value_node['Number'].get('n', 0)
+                elif 'Table' in value_node:
+                    value = value_node  # bleibt wie gehabt
                 else:
-                    eprint("\tWARNING: " + key + " = " + str(value) + " set, but module ip_server.client NOT present! Backend synchronisation deactivated!")
+                    continue  # Unbekannter Wertetyp → überspringen
+                if key in "enr_timeout":
+                    DEF_TIMEOUT = int(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "acquire_interval":
+                    DEF_ACQUIRE_INTERVAL = int(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "dns_server":
+                    DEF_DNS_SERVER = str(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "extip_dnsname":
+                    DEF_EXTIP_DNSNAME = str(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "enr_split_hd_lines":
+                    DEF_ENR_SPLIT = int(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "madcatlog_fifo":
+                    DEF_MADCATLOG_FIFO = str(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "user":
+                    DEF_USER = str(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "group":
+                    DEF_GROUP = str(value)
+                    eprint("\t" + key + " = " + str(value))
+                if key in "enr_output_files": #value is a parsed Lua-Table!
+                        DEF_OUTPUT_FILES = list()
+                        GLOBAL_OUTPUT_STDOUT = False #if configured, set STDOUT output to false
+                        try:
+                            eprint("\tenr_output_files:")
+                            for field in value['Table']['fields']:
+                                eprint("\t\t" + field['Field']['value']['String']['s'])
+                                try: #numbers are ignored, because filenames must be strings
+                                    if field['Field']['value']['String']['s'] == "<STDOUT>":
+                                        GLOBAL_OUTPUT_STDOUT = True #if STDOUT is explicitly set, set STDOUT output back to true
+                                        continue
+                                    DEF_OUTPUT_FILES.append(field['Field']['value']['String']['s'])
+                                    GLOBAL_OUTPUT_FILES = True
+                                    continue
+                                except KeyError:
+                                    pass
+                        except KeyError: #empty table, set back STDOUT output to true as default
+                            DEF_OUTPUT_FILES = None
+                            GLOBAL_OUTPUT_FILES = False
+                            GLOBAL_OUTPUT_STDOUT = True
+                if key in "enr_ip_server_backend":
+                    ip_server_client_configured = True
+                    if GLOBAL_IP_SERVER_CLIENT_PRESENT:
+                        DEF_IP_SERVER_HOST = str(value)
+                        ip_server.client.config(DEF_IP_SERVER_HOST, "\tBACKEND SYNC: ")
+                        eprint("\t" + key + " = " + str(value))
+                    else:
+                        eprint("\tWARNING: " + key + " = " + str(value) + " set, but module ip_server.client NOT present! Backend synchronisation deactivated!")
+            except Exception as e:
+                logtime = datetime.now().astimezone().isoformat()
+                eprint(logtime + " ⚠️ Fehler beim Parsen der Konfiguration: " + repr(e))
+                continue
         if not ip_server_client_configured:
             eprint("\tWARNING: \"enr_ip_server_backend\" NOT set, but module ip_server.client present! Backend synchronisation deactivated!")
             GLOBAL_IP_SERVER_CLIENT_PRESENT = False
