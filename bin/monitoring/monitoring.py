@@ -687,7 +687,11 @@ def main(argv):
     # Set locale to system default local for appropriate dealing with
     # timestring formats
     lang, enc = locale.getdefaultlocale()
-    locale.setlocale(locale.LC_TIME, (lang, enc))
+    try:
+        locale.setlocale(locale.LC_TIME, (lang, enc))
+    except locale.Error:
+        locale.setlocale(locale.LC_TIME, 'C')
+
 
     firstrun = True
     while True:
