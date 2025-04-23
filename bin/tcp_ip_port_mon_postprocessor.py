@@ -126,28 +126,42 @@ stdout_lock = threading.Lock()
 ########################## SIGINT Signal Hander ##########################
 # ...for gracefull shutdown
 def parse_config_list(config_txt):
-    tree = ast.parse(config_txt)
-    tree_json = json.loads(ast.to_pretty_json(tree))
-    top = tree_json.get("Chunk", tree_json)
-    stmts = top.get("body", top)
-    if isinstance(stmts, dict) and "Block" in stmts:
-        stmts = stmts["Block"].get("body", [])
+    try:
+        tree = ast.parse(config_txt)
+        config_dict = ast.to_dict(tree)
+    except Exception as e:
+        print(f"[ERROR] AST parsing failed: {e}", file=sys.stderr)
+        return []
 
-    if not isinstance(stmts, list):
-        print("❌ Ungültiger Body:", file=sys.stderr)
-        sys.exit(1)
+    # Fallback-Logik für verschiedene AST-Formate
+    if isinstance(config_dict, dict):
+        if "Chunk" in config_dict:
+            body = config_dict["Chunk"].get("body", [])
+        elif config_dict.get("type") == "Assign":
+            body = [config_dict]
+        elif "body" in config_dict:
+            body = config_dict["body"]
+        else:
+            body = [{"type": "Return", "values": [config_dict]}]
+    elif isinstance(config_dict, list):
+        body = config_dict
+    else:
+        body = [{"type": "Return", "values": [config_dict]}]
 
     valid_assignments = []
-    for item in stmts:
-        if "Assign" in item:
-            assign = item["Assign"]
+    for item in body:
+        # Suche nach Assign-Statements
+        assign = item.get("Assign") if isinstance(item, dict) else None
+        if assign and "targets" in assign and "values" in assign:
             try:
                 if assign["targets"][0].get("Name"):
                     valid_assignments.append(assign)
             except Exception as e:
-                print(f"⚠️  Überspringe ungültigen Assign-Block: {e}", file=sys.stderr)
+                print(f"[WARN] Skipping invalid assignment: {e}", file=sys.stderr)
                 continue
+
     return valid_assignments
+
 
 
 def signal_handler_sigint(signum, frame):
