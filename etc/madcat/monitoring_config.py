@@ -65,16 +65,16 @@ CHECK_LASTLOGIN = True #Alerts, when a login is active
 ## MADCAT
 CHECK_LASTLOG = True #Alerst, when log has not been written since LOGTIME_ALERT seconds
 LOGTIME_ALERT = 600
-LOG_LIST = ["/data/portmonitor.log",
+LOG_LIST = ["/data/madcat.log",
             "/var/log/syslog"]
 
 CHECK_MCVERSIONS = True #Does not alert, just informational
-MCVERSION_LIST = ["/opt/portmonitor/monitoring/monitoring.py",
-                "/opt/portmonitor/tcp_ip_port_mon",
-                "/opt/portmonitor/udp_ip_port_mon",
-                "/opt/portmonitor/icmp_mon",
-                "/opt/portmonitor/raw_mon",
-                "/opt/portmonitor/tcp_ip_port_mon_postprocessor.py"]
+MCVERSION_LIST = ["/opt/madcat/monitoring/monitoring.py",
+                "/opt/madcat/tcp_ip_port_mon",
+                "/opt/madcat/udp_ip_port_mon",
+                "/opt/madcat/icmp_mon",
+                "/opt/madcat/raw_mon",
+                "/opt/madcat/tcp_ip_port_mon_postprocessor.py"]
 
 ## General
 CHECK_PROCESSES = True #Alerts, when process is not running
