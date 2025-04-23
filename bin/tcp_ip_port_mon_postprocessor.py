@@ -125,7 +125,21 @@ stdout_lock = threading.Lock()
 
 ########################## SIGINT Signal Hander ##########################
 # ...for gracefull shutdown
-
+def parse_config_list(config_txt):
+    """Gibt eine Liste von Assign‑Nodes zurück – robust gegen flache/verschachtelte ASTs."""
+    tree_json = json.loads(ast.to_pretty_json(ast.parse(config_txt)))
+    # Top‑Level ermitteln
+    top = tree_json.get("Chunk", tree_json)
+    # Statements extrahieren
+    stmts = top.get("body", top)
+    # Block‑Wrapper abwickeln
+    if isinstance(stmts, dict) and "Block" in stmts:
+        stmts = stmts["Block"].get("body", [])
+    if not isinstance(stmts, list):
+        print("❌ Konfig‑Parsing fehlgeschlagen, unerwarteter Body:", file=sys.stderr)
+        print(json.dumps(tree_json, indent=2), file=sys.stderr)
+        sys.exit(1)
+    return stmts
 
 def signal_handler_sigint(signum, frame):
     global GLOBAL_SHUTDOWN, DEF_SYN_TIMEOUT
@@ -835,10 +849,7 @@ def main(argv):
                " No config file given as parameter or not found. Using default values.")
 
     if len(config_txt) > 0:  # Parse config
-        config_tree = ast.parse(config_txt)
-        config_list = json.loads(ast.to_pretty_json(config_tree))[
-            'Chunk']['body']['Block']['body']
-        for item in config_list:  # only strings and numbers are relevant for config
+        for item in parse_config_list(config_txt):
             key = item['Assign']['targets'][0]['Name']['id']
             value_list = item['Assign']['values'][0]
             if 'String' in value_list:
