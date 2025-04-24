@@ -14,7 +14,3 @@ sudo /opt/madcat/raw_mon /etc/madcat/config.lua 2>> /data/error.raw.log 1>>/tmp/
 sudo /opt/madcat/tcp_ip_port_mon /etc/madcat/config.lua 2>>/data/error.tcp.log 1>>/dev/null &
 # Give TCP-Module some time to start up and open configured FIFOs /tmp/confifo.tpm and /tmp/hdrfifo.tpm
 sleep 1
-# Start TCP Postprocessor, let it pipe results to Enrichment Processor FIFO.
-sudo /usr/bin/python3 /opt/madcat/enrichment_processor.py /etc/madcat/config.lua \
-  >> /dev/null 2>> /data/error.enrichment.log &
-
