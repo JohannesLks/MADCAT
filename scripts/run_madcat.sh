@@ -2,15 +2,35 @@
 #Set iptables rules for TCP- and UDP-Modules
 sudo iptables -t nat -A PREROUTING -i enp0s8 -p tcp --dport 1:65534 -j DNAT --to 192.168.1.100:65535
 sudo iptables -I OUTPUT -p icmp --icmp-type destination-unreachable -j DROP
-# Start Enrichment Processor, piping results to /data/madcat.log
-sudo /usr/bin/python3 /opt/madcat/enrichment_processor.py /etc/madcat/config.lua  2>>/data/error.enrichment.log 1>>/data/enriched.json.log &
-# Give Enrichment Processor time to start up and open /tmp/logs.erm as configured
+# Stelle sicher, dass FIFO sauber vorhanden ist
+FIFO="/tmp/logs.erm"
+rm -f "$FIFO"
+mkfifo "$FIFO"
+
+# Starte Enrichment Processor → liest von FIFO, schreibt JSON in Datei
+/usr/bin/python3 /opt/madcat/enrichment_processor.py /etc/madcat/config.lua \
+  >> /data/enriched.json.log 2>> /data/error.enrichment.log &
+
+# Kurze Wartezeit, damit FIFO geöffnet wird
 sleep 1
-# Start UDP-, ICMP-, RAW-Module, let them pipe results to Enrichment Processor FIFO.
-sudo /opt/madcat/udp_ip_port_mon /etc/madcat/config.lua 2>>/data/error.udp.log 1>>/tmp/logs.erm &
-sudo /opt/madcat/icmp_mon /etc/madcat/config.lua 2>> /data/error.icmp.log 1>>/tmp/logs.erm &
-sudo /opt/madcat/raw_mon /etc/madcat/config.lua 2>> /data/error.raw.log 1>>/tmp/logs.erm &
-# Start TCP-Module
-sudo /opt/madcat/tcp_ip_port_mon /etc/madcat/config.lua 2>>/data/error.tcp.log 1>>/dev/null &
-# Give TCP-Module some time to start up and open configured FIFOs /tmp/confifo.tpm and /tmp/hdrfifo.tpm
+
+# Starte UDP-, ICMP- und RAW-Module → schreiben ins FIFO
+/opt/madcat/udp_ip_port_mon /etc/madcat/config.lua \
+  >> "$FIFO" 2>> /data/error.udp.log &
+
+/opt/madcat/icmp_mon /etc/madcat/config.lua \
+  >> "$FIFO" 2>> /data/error.icmp.log &
+
+/opt/madcat/raw_mon /etc/madcat/config.lua \
+  >> "$FIFO" 2>> /data/error.raw.log &
+
+# Starte TCP-Module → schreibt NICHT direkt ins FIFO
+/opt/madcat/tcp_ip_port_mon /etc/madcat/config.lua \
+  >> /dev/null 2>> /data/error.tcp.log &
+
+# Kurze Wartezeit, damit FIFO-Dateien erstellt werden
 sleep 1
+
+# Starte Postprocessor → schreibt ins FIFO
+/usr/bin/python3 /opt/madcat/tcp_ip_port_mon_postprocessor.py /etc/madcat/config.lua \
+  >> "$FIFO" 2>> /data/error.postprocessor.log &
